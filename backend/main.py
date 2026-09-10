@@ -9,45 +9,83 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# -----------------------------
+# Environment variables
+# -----------------------------
+
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
 if not GROQ_API_KEY:
-    raise RuntimeError("GROQ_API_KEY is not set. Add it to your .env file or Render environment variables.")
+    raise RuntimeError(
+        "GROQ_API_KEY is not set. "
+        "Add it to your .env file or Render environment variables."
+    )
+
+GROQ_MODEL = os.getenv(
+    "GROQ_MODEL",
+    "openai/gpt-oss-120b"
+)
+
+ALLOWED_ORIGIN = os.getenv(
+    "ALLOWED_ORIGIN",
+    "http://localhost:5173"
+)
+
+# -----------------------------
+# Groq client
+# -----------------------------
 
 client = Groq(api_key=GROQ_API_KEY)
 
-# The model Groq is currently serving for fast, free-tier friendly chat.
-# You can change this to any model listed in your Groq console.
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+# -----------------------------
+# FastAPI app
+# -----------------------------
 
-app = FastAPI(title="AI IT Error Troubleshooting Assistant")
+app = FastAPI(
+    title="AI IT Error Troubleshooting Assistant"
+)
 
-# Allow your React frontend to call this API.
-# In production, replace "*" with your actual Render frontend URL for security.
+# -----------------------------
+# CORS
+# -----------------------------
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[ALLOWED_ORIGIN],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-SYSTEM_PROMPT = """You are an expert AI IT Support and Error Troubleshooting Assistant.
-A user will describe a technical error, error message, or IT issue (software, hardware,
-network, OS, application, or server related).
+# -----------------------------
+# System prompt
+# -----------------------------
+
+SYSTEM_PROMPT = """
+You are an expert AI IT Support and Error Troubleshooting Assistant.
+
+A user will describe a technical error, error message, or IT issue
+(software, hardware, network, OS, application, or server related).
 
 For every issue, respond in this clear structure:
+
 1. **Likely Cause** - short explanation of what is probably going wrong
 2. **Step-by-Step Fix** - numbered, actionable steps a non-expert can follow
 3. **If That Doesn't Work** - one or two alternative things to try
 
-Keep answers concise, practical, and beginner-friendly. Avoid unnecessary jargon.
-If the user gives too little detail to diagnose the issue, ask 1-2 clarifying questions
-instead of guessing.
+Keep answers concise, practical, and beginner-friendly.
+Avoid unnecessary jargon.
+
+If the user gives too little detail to diagnose the issue,
+ask 1-2 clarifying questions instead of guessing.
 """
 
+# -----------------------------
+# Request / Response models
+# -----------------------------
 
 class ChatMessage(BaseModel):
-    role: str  # "user" or "assistant"
+    role: str
     content: str
 
 
@@ -60,23 +98,54 @@ class ChatResponse(BaseModel):
     reply: str
 
 
+# -----------------------------
+# Health check
+# -----------------------------
+
 @app.get("/")
 def health_check():
-    return {"status": "ok", "message": "AI IT Troubleshooting Assistant backend is running"}
+    return {
+        "status": "ok",
+        "message": "AI IT Troubleshooting Assistant backend is running"
+    }
 
+
+# -----------------------------
+# Chat endpoint
+# -----------------------------
 
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
+
     if not request.message or not request.message.strip():
-        raise HTTPException(status_code=400, detail="message cannot be empty")
+        raise HTTPException(
+            status_code=400,
+            detail="message cannot be empty"
+        )
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages = [
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT
+        }
+    ]
 
-    # include prior conversation turns so the assistant has context
+    # Include previous conversation turns
     for turn in request.history:
-        messages.append({"role": turn.role, "content": turn.content})
+        messages.append(
+            {
+                "role": turn.role,
+                "content": turn.content
+            }
+        )
 
-    messages.append({"role": "user", "content": request.message})
+    # Add current user message
+    messages.append(
+        {
+            "role": "user",
+            "content": request.message
+        }
+    )
 
     try:
         completion = client.chat.completions.create(
@@ -85,13 +154,29 @@ def chat(request: ChatRequest):
             temperature=0.4,
             max_tokens=1024,
         )
-        reply = completion.choices[0].message.content
-        return ChatResponse(reply=reply)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Groq API error: {str(e)}")
 
+        reply = completion.choices[0].message.content
+
+        return ChatResponse(reply=reply)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Groq API error: {str(e)}"
+        )
+
+
+# -----------------------------
+# Local development
+# -----------------------------
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=port
+    )
