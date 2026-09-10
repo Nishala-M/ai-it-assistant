@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
 import './App.css'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -33,117 +35,82 @@ const quickPrompts = [
   },
 ]
 
-function formatInline(text) {
-  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g)
-
-  return parts.map((part, index) => {
-    if (part.startsWith('`') && part.endsWith('`')) {
-      return (
-        <code key={index} className="inline-code">
-          {part.slice(1, -1)}
-        </code>
-      )
-    }
-
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={index}>{part.slice(2, -2)}</strong>
-    }
-
-    return <span key={index}>{part}</span>
-  })
-}
-
 function MessageContent({ content }) {
-  const lines = content.split('\n')
-  const elements = []
-  let codeBlock = []
-  let insideCodeBlock = false
+  return (
+    <div className="message-content">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          h1: ({ children }) => <h2>{children}</h2>,
+          h2: ({ children }) => <h3>{children}</h3>,
+          h3: ({ children }) => <h3>{children}</h3>,
 
-  lines.forEach((line, index) => {
-    if (line.trim().startsWith('```')) {
-      if (insideCodeBlock) {
-        elements.push(
-          <pre className="code-block" key={`code-${index}`}>
-            <code>{codeBlock.join('\n')}</code>
-          </pre>,
-        )
-        codeBlock = []
-        insideCodeBlock = false
-      } else {
-        insideCodeBlock = true
-      }
-      return
-    }
+          p: ({ children }) => <p>{children}</p>,
 
-    if (insideCodeBlock) {
-      codeBlock.push(line)
-      return
-    }
+          ul: ({ children }) => <ul>{children}</ul>,
 
-    const trimmed = line.trim()
+          ol: ({ children }) => <ol>{children}</ol>,
 
-    if (!trimmed) {
-      elements.push(<div className="content-spacer" key={`space-${index}`} />)
-      return
-    }
+          li: ({ children }) => <li>{children}</li>,
 
-    if (trimmed.startsWith('### ')) {
-      elements.push(
-        <h3 key={index}>{formatInline(trimmed.replace(/^###\s+/, ''))}</h3>,
-      )
-      return
-    }
+          strong: ({ children }) => <strong>{children}</strong>,
 
-    if (trimmed.startsWith('## ')) {
-      elements.push(
-        <h3 key={index}>{formatInline(trimmed.replace(/^##\s+/, ''))}</h3>,
-      )
-      return
-    }
+          pre: ({ children }) => {
+            const codeText = children?.props?.children
 
-    if (trimmed.startsWith('# ')) {
-      elements.push(
-        <h3 key={index}>{formatInline(trimmed.replace(/^#\s+/, ''))}</h3>,
-      )
-      return
-    }
+            if (!codeText || !String(codeText).trim()) {
+              return null
+            }
 
-    const numbered = trimmed.match(/^(\d+)[.)]\s+(.*)$/)
+            return (
+              <pre className="code-block">
+                {children}
+              </pre>
+            )
+          },
 
-    if (numbered) {
-      elements.push(
-        <div className="formatted-list-item numbered" key={index}>
-          <span className="list-number">{numbered[1]}</span>
-          <span>{formatInline(numbered[2])}</span>
-        </div>,
-      )
-      return
-    }
+          code: ({ children, className, ...props }) => (
+            <code
+              className={className || 'inline-code'}
+              {...props}
+            >
+              {children}
+            </code>
+          ),
 
-    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      elements.push(
-        <div className="formatted-list-item" key={index}>
-          <span className="bullet">•</span>
-          <span>{formatInline(trimmed.substring(2))}</span>
-        </div>,
-      )
-      return
-    }
+          blockquote: ({ children }) => (
+            <blockquote>{children}</blockquote>
+          ),
 
-    elements.push(
-      <p key={index}>{formatInline(trimmed)}</p>,
-    )
-  })
+          hr: () => <hr />,
 
-  if (insideCodeBlock && codeBlock.length > 0) {
-    elements.push(
-      <pre className="code-block" key="final-code">
-        <code>{codeBlock.join('\n')}</code>
-      </pre>,
-    )
-  }
+          a: ({ children, href }) => (
+            <a href={href} target="_blank" rel="noopener noreferrer">
+              {children}
+            </a>
+          ),
 
-  return <div className="message-content">{elements}</div>
+          table: ({ children }) => (
+            <div className="table-wrapper">
+              <table>{children}</table>
+            </div>
+          ),
+
+          thead: ({ children }) => <thead>{children}</thead>,
+
+          tbody: ({ children }) => <tbody>{children}</tbody>,
+
+          tr: ({ children }) => <tr>{children}</tr>,
+
+          th: ({ children }) => <th>{children}</th>,
+
+          td: ({ children }) => <td>{children}</td>,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  )
 }
 
 function App() {
@@ -484,6 +451,7 @@ function App() {
                   strokeWidth="2"
                   strokeLinecap="round"
                 />
+
                 <path
                   d="M13 6L19 12L13 18"
                   stroke="currentColor"
