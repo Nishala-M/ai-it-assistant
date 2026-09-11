@@ -1,5 +1,7 @@
 # AI IT Error Troubleshooting Assistant
 
+**🔗 Live Demo:** [https://frontend-nishala-m.vercel.app/](https://frontend-nishala-m.vercel.app/)
+
 A simple full-stack AI assistant that diagnoses IT errors and gives step-by-step fixes.
 
 - **Frontend:** React (Vite)
